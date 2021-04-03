@@ -3,7 +3,7 @@ project(so_2 C)
 
 enable_language(C ASM_NASM)
 set(CMAKE_C_STANDARD 11)
-set(CMAKE_ASM_NASM_FLAGS_DEBUG "-g -Fdwarf")
+set(CMAKE_ASM_NASM_FLAGS_DEBUG "-g -Fdwarf -DN=3")
 
 set(CMAKE_ASM_NASM_COMPILE_OBJECT "<CMAKE_ASM_NASM_COMPILER> <INCLUDES> <FLAGS> -o <OBJECT> <SOURCE>")
 
@@ -19,4 +19,4 @@ add_executable(notec notec.asm example.c)
 
 # target_link_options(notec PRIVATE -fno-pie -no-pie)
 
-set(CMAKE_C_FLAGS "-DN=2 -lpthread")
+set(CMAKE_C_FLAGS "-DN=1 -lpthread")
