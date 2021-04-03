@@ -19,4 +19,4 @@ add_executable(notec notec.asm example.c)
 
 # target_link_options(notec PRIVATE -fno-pie -no-pie)
 
-set(CMAKE_C_FLAGS "-DN=1 -lpthread")
+set(CMAKE_C_FLAGS "-DN=3 -lpthread")

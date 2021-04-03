@@ -9,11 +9,12 @@
 
         section .text
 
-; uint64_t notec(uint32_t n, char const *calc);
 notec:
+        push rbp
         push r13                       ; Dla zgodności z ABI zapisujemy rejestry r13-r15.
         push r14
         push r15
+        mov rbp, rsp                   ; Zapisuję ades powrotu.
         mov r14d, edi                  ; r14 - n
         mov r15, rsi                   ; r15 - adres ciągu instrukcji
 
@@ -21,8 +22,7 @@ notec:
         mov r13d, PUSH_MODE
 
 .loop_condition_without_setting_push_mode:
-
-        xor rax, rax                   ; TODO eax
+        xor eax, eax
         mov al, [r15]                  ; Wczytujemy następną instrukcje.
         inc r15                        ; Przesuwamy wskaźnik na następną instrukcję.
         test al, al                    ; Sprawdzamy czy to koniec ciągu instrukcji.
@@ -158,16 +158,11 @@ notec:
         jmp .loop_over_instructions
 ;g – Wywołaj (zaimplementowaną gdzieś indziej w języku C lub Asemblerze) funkcję:
 .call_debug:
-; int64_t debug(uint32_t n, uint64_t *stack_pointer);
-; Parametr n zawiera numer instancji Notecia wywołującego tę funkcję.
-; Parametr stack_pointer wskazuje na wierzchołek stosu Notecia.
-; Funkcja debug może zmodyfikować stos. Wartość zwrócona przez tę funkcję oznacza,
-; o ile pozycji należy przesunąć wierzchołek stosu po jej wykonaniu.
         mov edi, r14d
         mov rsi, rsp
-        call debug
-        mov edi, 8
-        mul rdi                        ; TODO znaki?
+        call debug                     ; Umieszcza w rax o ile pozycji przesunąć stos.
+        mov edi, 8                     ; Przeliczamy to na przesunięcie w bajtach.
+        mul rdi                        ; Przeliczamy to na przesunięcie w bajtach.
         add rsp, rax
         jmp .loop_over_instructions
 
@@ -193,7 +188,9 @@ notec:
 
 .exit:
         pop rax                        ; zdejmujemy ostatni element który został na stosie
+        mov rsp, rbp
         pop r15                        ; Dla zgodności z ABI przywracamy rejestry r13-r15.
         pop r14
         pop r13
+        pop rbp
         ret
