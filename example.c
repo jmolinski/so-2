@@ -3,8 +3,6 @@
 #include <stdio.h>
 #include <pthread.h>
 
-#define ITERATIONS 10000
-
 extern uint64_t notec(uint32_t n, char const *calc);
 int64_t debug(uint32_t n, uint64_t *stack_pointer) {
     (void)n;
@@ -12,49 +10,77 @@ int64_t debug(uint32_t n, uint64_t *stack_pointer) {
     return 0;
 }
 
-void *thread1() {
-    char buf[128];
-    uint64_t x;
-    for (uint64_t i = 0; i < ITERATIONS; i++) {
-        sprintf(buf, "%lx=2W", 1234+i);
-        x = notec(1, buf);
-        if (x != 1337 + i)
-            abort();
-        sprintf(buf, "%lx=3W", 2345+i);
-        x = notec(1, buf);
-        if (x != 2137 + i)
-            abort();
-    }
-    return NULL;
-}
-void *thread2() {
-    char buf[128];
-    for (uint64_t i = 0; i < ITERATIONS; i++) {
-        sprintf(buf, "%lx=1W", 1337+i);
-        uint64_t x = notec(2, buf);
-        if (x != 1234 + i)
-            abort();
-    }
-    return NULL;
-}
-void *thread3() {
-    char buf[128];
-    for (uint64_t i = 0; i < ITERATIONS; i++) {
-        sprintf(buf, "%lx=1W", 2137+i);
-        uint64_t x = notec(3, buf);
-        if (x != 2345 + i)
-            abort();
-    }
-    return NULL;
-}
+const char *NUMBER_CHARS = "0123456789abcdefABCDEF";
 
 int main() {
-    pthread_t t1, t2, t3;
-    pthread_create(&t1, NULL, thread1, NULL);
-    pthread_create(&t2, NULL, thread2, NULL);
-    pthread_create(&t3, NULL, thread3, NULL);
-    pthread_join(t1, NULL);
-    pthread_join(t2, NULL);
-    pthread_join(t3, NULL);
+    const size_t size = 1024 * 1024 * 1024;
+    const int limit_stack_size = 512 * 1024;
+    clock_t begin, end;
+
+    srand(1337);
+
+    char *buf = malloc(size);
+    for (size_t i = 0; i < size; i++) {
+        buf[i] = NUMBER_CHARS[rand() % 10];
+    }
+
+    // https://stackoverflow.com/a/5249150
+    printf("Number test time: ");
+    begin = clock();
+    notec(0, buf);
+    end = clock();
+    printf("%lfs\n", (double)(end - begin) / CLOCKS_PER_SEC);
+
+    int stack_size = 0;
+    int max_stack_size = 0;
+    int parse_mode = 0;
+    for (size_t i = 0; i < size; i++) {
+        if (stack_size > max_stack_size)
+            max_stack_size = stack_size;
+        if (stack_size >= limit_stack_size) {
+            buf[i] = 'Z';
+            --stack_size;
+            parse_mode = 0;
+            continue;
+        }
+        int x = rand() % 8;
+        if (x == 0) {
+            buf[i] = "Nn"[rand() % 2];
+            ++stack_size;
+            parse_mode = 0;
+        } else if (x == 1 && stack_size > 0) {
+            buf[i] = "-~"[rand() % 2];
+            parse_mode = 0;
+        } else if (x == 2 && stack_size > 0) {
+            buf[i] = 'Z';
+            --stack_size;
+            parse_mode = 0;
+        } else if (x == 3 && stack_size > 0) {
+            buf[i] = 'Y';
+            ++stack_size;
+            parse_mode = 0;
+        } else if (x == 4 && stack_size > 1) {
+            buf[i] = "+*&|^"[rand() % 5];
+            --stack_size;
+            parse_mode = 0;
+        } else if (x == 5 && stack_size > 1) {
+            buf[i] = 'X';
+            parse_mode = 0;
+        } else {
+//            buf[i] = NUMBER_CHARS[rand() % 10]; - we do not need to this since it was set up by the previous test to a number
+            if (!parse_mode) {
+                stack_size++;
+                parse_mode = 1;
+            }
+        }
+    }
+    printf("Max stack size for chaos test: %d\n", max_stack_size);
+
+    printf("Chaos test time: ");
+    begin = clock();
+    notec(0, buf);
+    end = clock();
+    printf("%lfs\n", (double)(end - begin) / CLOCKS_PER_SEC);
+
     return 0;
 }
