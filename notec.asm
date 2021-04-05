@@ -14,9 +14,6 @@
 
         section .bss
         align 16
-
-; 1. czy wartosc odczytana 2. wartosc top stosu 3. na kogo czekam
-
         czy_zainicjowane resq N
         czy_odczytana resq N
         top_stosu resq N
@@ -183,9 +180,9 @@ notec:
         mov edi, r14d
         mov rsi, rsp
 
-        mov rax, rsp
+        mov eax, esp
         and eax, 1000b
-        cmp eax, 0
+        test eax, eax
         jnz .add_8b                    ; jest 8 aligned, czyli dodajemy 8
 ; jak jest 16-aligned to trzeba dodać 8
 ; jak nie jest 16-aligned to trzeba dodać 16
@@ -198,13 +195,12 @@ notec:
 .call_debug_function:
         call debug                     ; Umieszcza w rax o ile pozycji przesunąć stos.
         pop rcx
-        cmp rcx, 16
+        cmp ecx, 16
         jne .adjust_stack_end
         pop rcx
 
 .adjust_stack_end:
         lea rsp, [rsp + 8*rax]
-
         jmp .loop_over_instructions
 
 ; W – Zdejmij wartość ze stosu, potraktuj ją jako numer instancji Notecia m.
@@ -220,7 +216,7 @@ notec:
         mov esi, r14d
         shl rsi, 3
         mov ecx, edi
-        shl ecx, 3
+        shl rcx, 3
 
 ; poczekaj aż ten drugi zostanie zainicjowany
         lea rdx, [czy_zainicjowane]

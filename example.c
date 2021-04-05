@@ -1,68 +1,60 @@
-#include <assert.h>
-#include <pthread.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
+#include <pthread.h>
 
-// Przeniesienie liczby 2137 z notecia 0 do notecia N-1, przekazując liczbę po kolei sąsiadom.
+#define ITERATIONS 10000
 
-uint64_t notec(uint32_t n, char const* calc);
-int64_t debug(uint32_t n, uint64_t* stack_pointer);
-
-volatile unsigned wait = 1;
-
-static char calcs[N][10];
-
-int64_t debug(uint32_t n, uint64_t* stack_pointer) {
-    // printf("%lu\n", *stack_pointer);
+extern uint64_t notec(uint32_t n, char const *calc);
+int64_t debug(uint32_t n, uint64_t *stack_pointer) {
     (void)n;
-    assert(*stack_pointer == 2137);
+    (void)stack_pointer;
     return 0;
 }
 
-void* thread_routine(void* data) {
-    uint32_t n = *(uint32_t*)data;
-    const char* calc;
-
-    calc = calcs[n];
-
-    while (wait)
-        ;
-
-    uint64_t result = notec(n, calc);
-    // printf("num: %d, result %lu\n", n, result);
-
-    if (n < N - 1) {
-        assert(result == 0);
-    } else {
-        assert(result = 2137);
+void *thread1() {
+    char buf[128];
+    uint64_t x;
+    for (uint64_t i = 0; i < ITERATIONS; i++) {
+        sprintf(buf, "%lx=2W", 1234+i);
+        x = notec(1, buf);
+        if (x != 1337 + i)
+            abort();
+        sprintf(buf, "%lx=3W", 2345+i);
+        x = notec(1, buf);
+        if (x != 2137 + i)
+            abort();
     }
-
+    return NULL;
+}
+void *thread2() {
+    char buf[128];
+    for (uint64_t i = 0; i < ITERATIONS; i++) {
+        sprintf(buf, "%lx=1W", 1337+i);
+        uint64_t x = notec(2, buf);
+        if (x != 1234 + i)
+            abort();
+    }
+    return NULL;
+}
+void *thread3() {
+    char buf[128];
+    for (uint64_t i = 0; i < ITERATIONS; i++) {
+        sprintf(buf, "%lx=1W", 2137+i);
+        uint64_t x = notec(3, buf);
+        if (x != 2345 + i)
+            abort();
+    }
     return NULL;
 }
 
 int main() {
-    pthread_t tid[N];
-    uint32_t n[N];
-    strcpy(calcs[0], "859g1W");
-    strcpy(calcs[N - 1], "0g1W");
-    sprintf(calcs[N - 1], "0=%02XWg", N - 2);
-    for (int i = 1; i < N - 1; i++) {
-        sprintf(calcs[i], "0=%02XWg%02XW", i - 1, i + 1);
-    }
-
-    for (int i = N - 1; i >= 0; i--) {
-        n[i] = i;
-        // printf("%i started\n", i);
-        assert(0 == pthread_create(&tid[i], NULL, &thread_routine, (void*)&n[i]));
-    }
-
-    wait = 0;
-
-    for (int i = 0; i < N; ++i) {
-        // printf("%d exited\n", i);
-        assert(0 == pthread_join(tid[i], NULL));
-    }
-
+    pthread_t t1, t2, t3;
+    pthread_create(&t1, NULL, thread1, NULL);
+    pthread_create(&t2, NULL, thread2, NULL);
+    pthread_create(&t3, NULL, thread3, NULL);
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+    pthread_join(t3, NULL);
     return 0;
 }
