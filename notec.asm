@@ -182,8 +182,29 @@ notec:
 .call_debug:
         mov edi, r14d
         mov rsi, rsp
+
+        mov rax, rsp
+        and eax, 1000b
+        cmp eax, 0
+        jnz .add_8b                    ; jest 8 aligned, czyli dodajemy 8
+; jak jest 16-aligned to trzeba dodać 8
+; jak nie jest 16-aligned to trzeba dodać 16
+        push rax
+        push 16
+        jmp .call_debug_function
+.add_8b:
+        push 8
+
+.call_debug_function:
         call debug                     ; Umieszcza w rax o ile pozycji przesunąć stos.
+        pop rcx
+        cmp rcx, 16
+        jne .adjust_stack_end
+        pop rcx
+
+.adjust_stack_end:
         lea rsp, [rsp + 8*rax]
+
         jmp .loop_over_instructions
 
 ; W – Zdejmij wartość ze stosu, potraktuj ją jako numer instancji Notecia m.
