@@ -6,15 +6,15 @@
         NUMBER_INSERT_MODE equ 1
         MAX_HEX_DIGIT_VALUE equ 15
 
-        IS_UNREAD equ 1
-        IS_READ equ 0
+        IS_UNREAD equ 2
+        IS_READ equ 1
+        NOT_INITIALIZED equ 0
 
         global notec
         extern debug
 
         section .bss
         align 16
-        czy_zainicjowane resq N
         czy_odczytana resq N
         top_stosu resq N
         na_kogo_czekam resq N
@@ -32,14 +32,13 @@ notec:
 
         mov edi, r14d
         shl rdi, 3
-
         lea rdx, [na_kogo_czekam]
         add rdx, rdi
-        mov dword [rdx], -1
+        mov qword [rdx], -1
 
-        lea rdx, [czy_zainicjowane]
+        lea rdx, [czy_odczytana]
         add rdx, rdi
-        mov dword [rdx], 1
+        mov dword [rdx], IS_READ
 
 .loop_condition:
         mov r13d, PUSH_MODE
@@ -219,12 +218,12 @@ notec:
         shl rcx, 3
 
 ; poczekaj aż ten drugi zostanie zainicjowany
-        lea rdx, [czy_zainicjowane]
+        lea rdx, [czy_odczytana]
         add rdx, rcx
 .busy_wait_for_other_notec_to_be_initialized:
         mov eax, [rdx]
-        test eax, eax
-        jz .busy_wait_for_other_notec_to_be_initialized
+        cmp eax, NOT_INITIALIZED
+        je .busy_wait_for_other_notec_to_be_initialized
 
 ; ustaw mi flage że moja wartość stosowa nieodczytana (czekaj aż będzie się dało to zrobić)
         lea rdx, [czy_odczytana]
@@ -258,7 +257,7 @@ notec:
 ; oznaczam mu że przeczytałem jego wartość
         lea rdx, [na_kogo_czekam]
         add rdx, rcx
-        mov dword [rdx], -1            ; ustawienie nieprawidłowego oczekiwania
+        mov qword [rdx], -1            ; ustawienie nieprawidłowego oczekiwania
         lea rdx, [czy_odczytana]
         add rdx, rcx
         mov byte [rdx], IS_READ
