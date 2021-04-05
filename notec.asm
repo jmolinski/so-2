@@ -1,11 +1,26 @@
 ; autor Jakub Molinski 419502
 
+        default rel
+
         PUSH_MODE equ 0
         NUMBER_INSERT_MODE equ 1
         MAX_HEX_DIGIT_VALUE equ 15
 
+        IS_UNREAD equ 1
+        IS_READ equ 0
+
         global notec
         extern debug
+
+        section .bss
+        align 16
+
+; 1. czy wartosc odczytana 2. wartosc top stosu 3. na kogo czekam
+
+        czy_zainicjowane resq N
+        czy_odczytana resq N
+        top_stosu resq N
+        na_kogo_czekam resq N
 
         section .text
 
@@ -17,6 +32,17 @@ notec:
         mov rbp, rsp                   ; Zapisuję ades powrotu.
         mov r14d, edi                  ; r14 - n
         mov r15, rsi                   ; r15 - adres ciągu instrukcji
+
+        mov edi, r14d
+        shl rdi, 3
+
+        lea rdx, [na_kogo_czekam]
+        add rdx, rdi
+        mov dword [rdx], -1
+
+        lea rdx, [czy_zainicjowane]
+        add rdx, rdi
+        mov dword [rdx], 1
 
 .loop_condition:
         mov r13d, PUSH_MODE
@@ -40,7 +66,7 @@ notec:
         sub dl, '0'
         cmp dl, 9
         cmovbe eax, edx
-        jbe .letter_handler
+        jbe .digit_handler
         cmp al, '='                    ; = – Wyjdź z trybu wpisywania liczby.
         je .loop_condition
         mov edx, eax
@@ -48,7 +74,7 @@ notec:
         add dl, 10
         cmp dl, MAX_HEX_DIGIT_VALUE
         cmovbe eax, edx
-        jbe .letter_handler
+        jbe .digit_handler
         cmp al, 'N'
         je .push_number_of_machines
         cmp al, 'W'
@@ -66,7 +92,7 @@ notec:
         add dl, 10
         cmp dl, MAX_HEX_DIGIT_VALUE
         cmovbe eax, edx
-        jbe .letter_handler
+        jbe .digit_handler
         cmp al, 'g'
         je .call_debug
         cmp al, 'n'
@@ -152,18 +178,83 @@ notec:
 .loop_over_instructions:
         jmp .loop_condition
 
-; W – Zdejmij wartość ze stosu, potraktuj ją jako numer instancji Notecia m.
-; Czekaj na operację W Notecia m ze zdjętym ze stosu numerem instancji Notecia n i zamień wartości na wierzchołkach stosów Noteci m i n.
-.exchange_with_other_machine:
-        jmp .loop_over_instructions
 ;g – Wywołaj (zaimplementowaną gdzieś indziej w języku C lub Asemblerze) funkcję:
 .call_debug:
         mov edi, r14d
         mov rsi, rsp
         call debug                     ; Umieszcza w rax o ile pozycji przesunąć stos.
-        mov edi, 8                     ; Przeliczamy to na przesunięcie w bajtach.
-        mul rdi                        ; Przeliczamy to na przesunięcie w bajtach.
-        add rsp, rax
+        lea rsp, [rsp + 8*rax]
+        jmp .loop_over_instructions
+
+; W – Zdejmij wartość ze stosu, potraktuj ją jako numer instancji Notecia m.
+; Czekaj na operację W Notecia m ze zdjętym ze stosu numerem instancji Notecia n i zamień wartości na wierzchołkach stosów Noteci m i n.
+.exchange_with_other_machine:
+        pop rdi                        ; Numer notecia m.
+
+;.busy_wait:
+; xchg [rdx], eax                ; Jeśli blokada otwarta, zamknij ją.
+; test eax, eax                  ; Sprawdź, czy blokada była otwarta.
+; jnz .busy_wait                 ; Skocz, gdy blokada była zamknięta.
+
+        mov esi, r14d
+        shl rsi, 3
+        mov ecx, edi
+        shl ecx, 3
+
+; poczekaj aż ten drugi zostanie zainicjowany
+        lea rdx, [czy_zainicjowane]
+        add rdx, rcx
+.busy_wait_for_other_notec_to_be_initialized:
+        mov eax, [rdx]
+        test eax, eax
+        jz .busy_wait_for_other_notec_to_be_initialized
+
+; ustaw mi flage że moja wartość stosowa nieodczytana (czekaj aż będzie się dało to zrobić)
+        lea rdx, [czy_odczytana]
+        add rdx, rsi
+        mov dword [rdx], IS_UNREAD
+
+; wstaw moją wartość to mojej komóreczki publicznej
+        lea rdx, [top_stosu]
+        add rdx, rsi
+        pop rax
+        mov [rdx], rax
+
+; ustaw mi flage że czekam na drugiego (m-tego)
+        lea rdx, [na_kogo_czekam]      ; Adres flagi obecnego notecia.
+        add rdx, rsi
+
+        mov [rdx], rdi
+
+; kiedy ten drugi ma flage że czeka na mnie wczytuje jego wartość
+        lea rdx, [na_kogo_czekam]      ; Czy ten drugi czeka na mnie?
+        add rdx, rcx
+.busy_wait_for_other_notec_to_want_to_communicate:
+        mov eax, [rdx]
+        cmp eax, r14d
+        jne .busy_wait_for_other_notec_to_want_to_communicate
+        lea rdx, [top_stosu]           ; Top stosu tego drugiego.
+        add rdx, rcx
+        mov rax, [rdx]
+        push rax
+
+; oznaczam mu że przeczytałem jego wartość
+        lea rdx, [na_kogo_czekam]
+        add rdx, rcx
+        mov dword [rdx], -1            ; ustawienie nieprawidłowego oczekiwania
+        lea rdx, [czy_odczytana]
+        add rdx, rcx
+        mov byte [rdx], IS_READ
+
+; on idzie dalej kiedy zobaczy że jego wartość odczytana
+
+        lea rdx, [czy_odczytana]
+        add rdx, rsi
+.wait_for_my_value_to_be_read:
+        mov eax, [rdx]
+        cmp eax, IS_READ
+        jne .wait_for_my_value_to_be_read
+
         jmp .loop_over_instructions
 
 ; 0 to 9, A to F, a to f – Znak jest interpretowany jako cyfra w zapisie przy podstawie 16.
@@ -172,18 +263,18 @@ notec:
 ; to na wierzchołek stosu jest wstawiana wartość podanej cyfry. Noteć przechodzi w tryb wpisywania liczby
 ; po wczytaniu jednego ze znaków z tej grupy, a wychodzi z trybu wpisywania liczby po wczytaniu dowolnego znaku
 ; nie należącego to tej grupy.
-.letter_handler:
+.digit_handler:
         cmp r13d, NUMBER_INSERT_MODE
-        je .letter_handler_shift_mode
+        je .digit_handler_shift_mode
         mov r13d, NUMBER_INSERT_MODE
         push rax
-        jmp .exit_letter_handler
-.letter_handler_shift_mode:
+        jmp .exit_digit_handler
+.digit_handler_shift_mode:
         pop rdi
         shl rdi, 4
         or rdi, rax
         push rdi
-.exit_letter_handler:
+.exit_digit_handler:
         jmp .loop_condition_without_setting_push_mode
 
 .exit:

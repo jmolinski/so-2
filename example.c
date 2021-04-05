@@ -2,91 +2,67 @@
 #include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
-// Interfejs między C a Asemblerem
-uint64_t notec(uint32_t n, char const *calc);
-int64_t debug(uint32_t n, uint64_t *stack_pointer);
+// Przeniesienie liczby 2137 z notecia 0 do notecia N-1, przekazując liczbę po kolei sąsiadom.
 
-// Chcemy wystartować wszystkie obliczenia możliwie jednocześnie.
+uint64_t notec(uint32_t n, char const* calc);
+int64_t debug(uint32_t n, uint64_t* stack_pointer);
+
 volatile unsigned wait = 1;
 
-// Startujemy co najwyżej jedno obliczenie calc_1
-// i parzystą liczbę obliczeń calc_2.
-// static const char calc_1[] = "6N8ZXab=12-+3*~FFF&cDe09|g";
- static const char calc_1[] = "6"; // 6
-// static const char calc_1[] = "6N";// 6 N
-// static const char calc_1[] = "6N8";// 6 N 8
-// static const char calc_1[] = "6N8Z";// 6 N
-// static const char calc_1[] = "6N8ZX"; // N 6
-// static const char calc_1[] = "6N8ZXa"; //N 6 10
-// static const char calc_1[] = "6N8ZXab"; // N 6 171
-// static const char calc_1[] = "6N8ZXab="; // N 6 171
-// static const char calc_1[] = "6N8ZXab=1"; // N 6 171 1
-// static const char calc_1[] = "6N8ZXab=12"; // N 6 171 18
-// static const char calc_1[] = "6N8ZXab=12-"; // N 6 171 18446744073709551598
-// static const char calc_1[] = "6N8ZXab=12-+";  // N 6 153
-// static const char calc_1[] = "6N8ZXab=12-+3"; // N 6 153 3
-// static const char calc_1[] = "6N8ZXab=12-+3*"; // N 6 459
-// static const char calc_1[] = "6N8ZXab=12-+3*~"; // N 6 18446744073709551156
-// static const char calc_1[] = "6N8ZXab=12-+3*~F"; // N 6 18446744073709551156 15
-// static const char calc_1[] = "6N8ZXab=12-+3*~FFF"; // N 6 18446744073709551156 4095
-// static const char calc_1[] = "6N8ZXab=12-+3*~FFF&"; // N 6 3636
-// static const char calc_1[] = "6N8ZXab=12-+3*~FFF&c"; // N 6 3636 12
-// static const char calc_1[] = "6N8ZXab=12-+3*~FFF&cD"; // N 6 3636 205
-// static const char calc_1[] = "6N8ZXab=12-+3*~FFF&cDe09"; // N 6 3636 843273
-// static const char calc_1[] = "6N8ZXab=12-+3*~FFF&cDe09|"; // N 6 843325
-// static const char calc_1[] = "6N8ZXab=12-+3*~FFF&cDe09|g"; // N 6
-static const char calc_2[] = "nY1^W";
-static const uint64_t result_1 = (~((0xab - 0x12) * 3) & 0xfff) | 0xcde09;
+static char calcs[N][10];
 
-// Ta funkcja jest wywoływana tylko w obliczeniu calc_1
-// w celu sprawdzenia jego poprawności.
-int64_t debug(uint32_t n, uint64_t *stack_pointer) {
-    assert(n == N - 1 && (n & 1) == 0);
-    // printf("%ld\n", result_1);
-    // printf("%ld\n", *stack_pointer);
-    assert(*stack_pointer == result_1);
-
-    // Usuwamy wynik ze stosu.
-    return 1;
+int64_t debug(uint32_t n, uint64_t* stack_pointer) {
+    // printf("%lu\n", *stack_pointer);
+    (void)n;
+    assert(*stack_pointer == 2137);
+    return 0;
 }
 
-void *thread_routine(void *data) {
-    uint32_t n = *(uint32_t *)data;
-    const char *calc;
+void* thread_routine(void* data) {
+    uint32_t n = *(uint32_t*)data;
+    const char* calc;
 
-    if (n == N - 1 && (n & 1) == 0) {
-        calc = calc_1; // To obliczenie jest uruchamiane co najwyżej w jednym wątku.
-    } else {
-        calc = calc_2; // To obliczenie jest uruchamiane w parzystej liczbie wątków.
-    }
-    while (wait) {
-    }
+    calc = calcs[n];
+
+    while (wait)
+        ;
 
     uint64_t result = notec(n, calc);
-    printf("num: %d, result %lu\n", n, result);
+    // printf("num: %d, result %lu\n", n, result);
 
-    if (n == N - 1 && (n & 1) == 0) {
-        assert(result == 6);
+    if (n < N - 1) {
+        assert(result == 0);
     } else {
-        assert(result == (n ^ 1));
+        assert(result = 2137);
     }
+
     return NULL;
 }
 
 int main() {
     pthread_t tid[N];
-    uint32_t i, n[N];
+    uint32_t n[N];
+    strcpy(calcs[0], "859g1W");
+    strcpy(calcs[N - 1], "0g1W");
+    sprintf(calcs[N - 1], "0=%02XWg", N - 2);
+    for (int i = 1; i < N - 1; i++) {
+        sprintf(calcs[i], "0=%02XWg%02XW", i - 1, i + 1);
+    }
 
-    for (i = 0; i < N; ++i) {
+    for (int i = N - 1; i >= 0; i--) {
         n[i] = i;
-        assert(0 == pthread_create(&tid[i], NULL, &thread_routine, (void *)&n[i]));
+        // printf("%i started\n", i);
+        assert(0 == pthread_create(&tid[i], NULL, &thread_routine, (void*)&n[i]));
     }
 
     wait = 0;
 
-    for (i = 0; i < N; ++i) {
+    for (int i = 0; i < N; ++i) {
+        // printf("%d exited\n", i);
         assert(0 == pthread_join(tid[i], NULL));
     }
+
     return 0;
 }
