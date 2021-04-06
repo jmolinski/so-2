@@ -91,34 +91,29 @@ notec:
         pop rax
         pop rdx
         and rax, rdx
-        push rax
-        jmp .loop_over_instructions
+        jmp .push_rax_and_loop_over_instructions
 ; * – Zdejmij dwie wartości ze stosu, oblicz ich iloczyn i wstaw wynik na stos.
 .product_operation:
         pop rax
         pop rdx
         mul rdx
-        push rax
-        jmp .loop_over_instructions
+        jmp .push_rax_and_loop_over_instructions
 ; + – Zdejmij dwie wartości ze stosu, oblicz ich sumę i wstaw wynik na stos.
 .sum_operation:
         pop rax
         pop rdx
         add rax, rdx
-        push rax
-        jmp .loop_over_instructions
+        jmp .push_rax_and_loop_over_instructions
 ; - – Zaneguj arytmetycznie wartość na wierzchołku stosu.
 .negate_operation:
         pop rax
         neg rax
-        push rax
-        jmp .loop_over_instructions
+        jmp .push_rax_and_loop_over_instructions
 ; Y – Wstaw na stos wartość z wierzchołka stosu, czyli zduplikuj wartość na wierzchu stosu.
 .duplicate_stack_top:
         pop rax
         push rax
-        push rax
-        jmp .loop_over_instructions
+        jmp .push_rax_and_loop_over_instructions
 ; n – Wstaw na stos numer instancji tego Notecia.
 .push_machine_number_on_stack:
         push r14
@@ -130,35 +125,32 @@ notec:
 ; N – Wstaw na stos liczbę Noteci.
 .push_number_of_machines:
         mov eax, N
-        push rax
-        jmp .loop_over_instructions
+        jmp .push_rax_and_loop_over_instructions
 ; X – Zamień miejscami dwie wartości na wierzchu stosu.
 .exchange_stack_top:
-        pop rax
         pop rdx
-        push rax
+        pop rax
         push rdx
-        jmp .loop_over_instructions
+        jmp .push_rax_and_loop_over_instructions
 ; ^ – Zdejmij dwie wartości ze stosu, wykonaj na nich operację XOR i wstaw wynik na stos.
 .xor_operation:
         pop rax
         pop rdx
         xor rax, rdx
-        push rax
-        jmp .loop_over_instructions
+        jmp .push_rax_and_loop_over_instructions
 ; | – Zdejmij dwie wartości ze stosu, wykonaj na nich operację OR i wstaw wynik na stos.
 .or_operation:
         pop rax
         pop rdx
         or rax, rdx
-        push rax
-        jmp .loop_over_instructions
+        jmp .push_rax_and_loop_over_instructions
 ; ~ – Zaneguj bitowo wartość na wierzchołku stosu.
 .bitwise_not_operation:
         pop rax
         not rax
-        push rax
 
+.push_rax_and_loop_over_instructions:
+        push rax
 .loop_over_instructions:
         jmp .loop_condition
 
