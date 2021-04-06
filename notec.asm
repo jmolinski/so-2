@@ -23,7 +23,8 @@
 
 notec:
         push rbp
-        push r13                       ; Dla zgodności z ABI zapisujemy rejestry r13-r15.
+        push r12                       ; Dla zgodności z ABI zapisujemy rejestry r12-r15.
+        push r13
         push r14
         push r15
         mov rbp, rsp                   ; Zapisuję ades powrotu.
@@ -169,7 +170,6 @@ notec:
         pop rax
         not rax
         push rax
-        jmp .loop_over_instructions
 
 .loop_over_instructions:
         jmp .loop_condition
@@ -179,27 +179,11 @@ notec:
         mov edi, r14d
         mov rsi, rsp
 
-        mov eax, esp
-        and eax, 1000b
-        test eax, eax
-        jnz .add_8b                    ; jest 8 aligned, czyli dodajemy 8
-; jak jest 16-aligned to trzeba dodać 8
-; jak nie jest 16-aligned to trzeba dodać 16
-        push rax
-        push 16
-        jmp .call_debug_function
-.add_8b:
-        push 8
-
-.call_debug_function:
+        mov r12, rsp
+        and rsp, -16
         call debug                     ; Umieszcza w rax o ile pozycji przesunąć stos.
-        pop rcx
-        cmp ecx, 16
-        jne .adjust_stack_end
-        pop rcx
 
-.adjust_stack_end:
-        lea rsp, [rsp + 8*rax]
+        lea rsp, [r12 + 8*rax]
         jmp .loop_over_instructions
 
 ; W – Zdejmij wartość ze stosu, potraktuj ją jako numer instancji Notecia m.
@@ -296,8 +280,9 @@ notec:
 .exit:
         pop rax                        ; zdejmujemy ostatni element który został na stosie
         mov rsp, rbp
-        pop r15                        ; Dla zgodności z ABI przywracamy rejestry r13-r15.
+        pop r15                        ; Dla zgodności z ABI przywracamy rejestry r12-r15 i rbp.
         pop r14
         pop r13
+        pop r12
         pop rbp
         ret
