@@ -7,6 +7,11 @@
         IS_READ equ 1
         IS_UNREAD equ 2
 
+        INVALID_NOTEC_ID equ -1
+        LOWERCASE_UPPERCASE_DIFF equ 32
+        UPPERCASE_HEX_TO_INT_DIFF equ 55
+        BITS_PER_HEX_DIGIT equ 4
+
         global notec
         extern debug
 
@@ -24,13 +29,12 @@ notec:
         push r13
         push r14
         push r15
-        mov rbp, rsp                   ; Zapisuję ades powrotu.
-        mov r14d, edi                  ; r14 - n
-        mov r15, rsi                   ; r15 - adres ciągu instrukcji
+        mov rbp, rsp                   ; Zapisuję adres powrotu.
+        mov r14d, edi                  ; r14 - n (numer notecia).
+        mov r15, rsi                   ; r15 - adres ciągu instrukcji.
 
-        lea rdx, [rel waiting_for]
-        mov dword [rdx + rdi*4], -1
-
+        lea rdx, [rel waiting_for]     ; Inicjalizacja zmiennych służących synchronizacji.
+        mov dword [rdx + rdi*4], INVALID_NOTEC_ID
         lea rdx, [rel notec_exchange_state]
         mov byte [rdx + r14], IS_READ
 
@@ -80,65 +84,65 @@ notec:
         je .or_operation
         jmp .bitwise_not_operation
 
-; & – Zdejmij dwie wartości ze stosu, wykonaj na nich operację AND i wstaw wynik na stos.
+; Zdejmij dwie wartości ze stosu, wykonaj na nich operację AND i wstaw wynik na stos.
 .and_operation:
         pop rax
         pop rdx
         and rax, rdx
         jmp .push_rax_and_loop_over_instructions
-; * – Zdejmij dwie wartości ze stosu, oblicz ich iloczyn i wstaw wynik na stos.
+; Zdejmij dwie wartości ze stosu, oblicz ich iloczyn i wstaw wynik na stos.
 .product_operation:
         pop rax
         pop rdx
         mul rdx
         jmp .push_rax_and_loop_over_instructions
-; + – Zdejmij dwie wartości ze stosu, oblicz ich sumę i wstaw wynik na stos.
+; Zdejmij dwie wartości ze stosu, oblicz ich sumę i wstaw wynik na stos.
 .sum_operation:
         pop rax
         pop rdx
         add rax, rdx
         jmp .push_rax_and_loop_over_instructions
-; - – Zaneguj arytmetycznie wartość na wierzchołku stosu.
+; Zaneguj arytmetycznie wartość na wierzchołku stosu.
 .negate_operation:
         pop rax
         neg rax
         jmp .push_rax_and_loop_over_instructions
-; Y – Wstaw na stos wartość z wierzchołka stosu, czyli zduplikuj wartość na wierzchu stosu.
+; Wstaw na stos wartość z wierzchołka stosu, czyli zduplikuj wartość na wierzchu stosu.
 .duplicate_stack_top:
         pop rax
         push rax
         jmp .push_rax_and_loop_over_instructions
-; n – Wstaw na stos numer instancji tego Notecia.
+; Wstaw na stos numer instancji tego Notecia.
 .push_machine_number_on_stack:
         push r14
         jmp .loop_over_instructions
-; Z – Usuń wartość z wierzchołka stosu.
+; Usuń wartość z wierzchołka stosu.
 .remove_stack_top:
         pop rax
         jmp .loop_over_instructions
-; N – Wstaw na stos liczbę Noteci.
+; Wstaw na stos liczbę Noteci.
 .push_number_of_machines:
         mov eax, N
         jmp .push_rax_and_loop_over_instructions
-; X – Zamień miejscami dwie wartości na wierzchu stosu.
+; Zamień miejscami dwie wartości na wierzchu stosu.
 .exchange_stack_top:
         pop rdx
         pop rax
         push rdx
         jmp .push_rax_and_loop_over_instructions
-; ^ – Zdejmij dwie wartości ze stosu, wykonaj na nich operację XOR i wstaw wynik na stos.
+; Zdejmij dwie wartości ze stosu, wykonaj na nich operację XOR i wstaw wynik na stos.
 .xor_operation:
         pop rax
         pop rdx
         xor rax, rdx
         jmp .push_rax_and_loop_over_instructions
-; | – Zdejmij dwie wartości ze stosu, wykonaj na nich operację OR i wstaw wynik na stos.
+; Zdejmij dwie wartości ze stosu, wykonaj na nich operację OR i wstaw wynik na stos.
 .or_operation:
         pop rax
         pop rdx
         or rax, rdx
         jmp .push_rax_and_loop_over_instructions
-; ~ – Zaneguj bitowo wartość na wierzchołku stosu.
+; Zaneguj bitowo wartość na wierzchołku stosu.
 .bitwise_not_operation:
         pop rax
         not rax
@@ -154,15 +158,13 @@ notec:
 ; to na wierzchołek stosu jest wstawiana wartość podanej cyfry. Noteć przechodzi w tryb wpisywania liczby
 ; po wczytaniu jednego ze znaków z tej grupy, a wychodzi z trybu wpisywania liczby po wczytaniu dowolnego znaku
 ; nie należącego to tej grupy.
-
 .digit_handler_under10:
-        sub al, '0'                    ; Conversion from ascii digit to integer value.
+        sub al, '0'                    ; Konwersja z ascii cyfry na wartość liczbową.
         jmp .digit_handler
 .digit_handler_lowercase_letter:
-        sub al, 32                     ; Conversion from lowercase to uppercase letter.
+        sub al, LOWERCASE_UPPERCASE_DIFF ; Zmiana z małej litery na wielką literę.
 .digit_handler_uppercase_letter:
-        sub al, 'A'                    ; Conversiom from uppercase letter to 10..15 value.
-        add al, 10
+        sub al, UPPERCASE_HEX_TO_INT_DIFF ; Zmiana z cyfry A..F na wartość liczbową 10..15.
 .digit_handler:
         cmp r13d, NUMBER_INSERT_MODE
         je .digit_handler_shift_mode
@@ -171,72 +173,61 @@ notec:
         jmp .exit_digit_handler
 .digit_handler_shift_mode:
         pop rdi
-        shl rdi, 4
+        shl rdi, BITS_PER_HEX_DIGIT
         or rdi, rax
         push rdi
 .exit_digit_handler:
         jmp .loop_condition_without_setting_push_mode
 
-;g – Wywołaj (zaimplementowaną gdzieś indziej w języku C lub Asemblerze) funkcję:
+; Wywołuje funkcję debug.
 .call_debug:
-        mov edi, r14d
-        mov rsi, rsp
+        mov edi, r14d                  ; Argument - numer Notecia.
+        mov rsi, rsp                   ; Argument - wskaźnik na wierzchołek stosu.
 
-        mov r12, rsp
-        and rsp, -16
+        mov r12, rsp                   ; Wyrównanie stosu (wymóg ABI).
+        and rsp, -16                   ; Zmiana na najmniejszą liczbę podzielną przez 16 niemniejszą od rsp.
         call debug                     ; Umieszcza w rax o ile pozycji przesunąć stos.
 
         lea rsp, [r12 + 8*rax]
         jmp .loop_over_instructions
 
-; W – Zdejmij wartość ze stosu, potraktuj ją jako numer instancji Notecia m.
+; Zdejmij wartość ze stosu, potraktuj ją jako numer instancji Notecia m.
 ; Czekaj na operację W Notecia m ze zdjętym ze stosu numerem instancji Notecia n i zamień wartości na wierzchołkach stosów Noteci m i n.
 .exchange_with_other_machine:
         pop rdi                        ; Numer notecia m.
 
-;.busy_wait:
-; xchg [rdx], eax                ; Jeśli blokada otwarta, zamknij ją.
-; test eax, eax                  ; Sprawdź, czy blokada była otwarta.
-; jnz .busy_wait                 ; Skocz, gdy blokada była zamknięta.
-
-; poczekaj aż ten drugi zostanie zainicjowany
         lea rdx, [rel notec_exchange_state]
 .busy_wait_for_other_notec_to_be_initialized:
-        mov al, [rdx + rdi]
+        mov al, [rdx + rdi]            ; Poczekaj aż Noteć m zostanie zainicjalizowany.
         cmp al, NOT_INITIALIZED
         je .busy_wait_for_other_notec_to_be_initialized
 
-; ustaw mi flage że moja wartość stosowa nieodczytana (czekaj aż będzie się dało to zrobić)
-        mov byte [rdx + r14], IS_UNREAD
+        mov byte [rdx + r14], IS_UNREAD ; Ustaw flagę, że moja wartość czeka na odebranie.
 
-; wstaw moją wartość to mojej komóreczki publicznej
-        lea rdx, [rel stack_top_value]
+        lea rdx, [rel stack_top_value] ; Umieść wierzchołek stosu w tablicy.
         pop rax
         mov [rdx + r14*8], rax
 
-; ustaw mi flage że czekam na drugiego (m-tego)
-        lea rdx, [rel waiting_for]     ; Adres flagi obecnego notecia.
+        lea rdx, [rel waiting_for]     ; Oznacz gotowość na komunikację z Noteciem m.
         mov [rdx + r14*4], edi
 
-; kiedy ten drugi ma flage że czeka na mnie wczytuje jego wartość
-; Czy ten drugi czeka na mnie?
 .busy_wait_for_other_notec_to_want_to_communicate:
-        mov eax, [rdx + rdi*4]
+        mov eax, [rdx + rdi*4]         ; Czekaj aż Noteć m będzie gotowy na komunikację.
         cmp eax, r14d
         jne .busy_wait_for_other_notec_to_want_to_communicate
-        lea rdx, [rel stack_top_value] ; Top stosu tego drugiego.
+
+        lea rdx, [rel stack_top_value] ; Wczytaj wierzchołek stosu Notecia m.
         mov rax, [rdx + rdi*8]
         push rax
 
-; oznaczam mu że przeczytałem jego wartość
-        lea rdx, [rel waiting_for]
-        mov dword [rdx + rdi*4], -1    ; ustawienie nieprawidłowego oczekiwania
-        lea rdx, [rel notec_exchange_state]
+        lea rdx, [rel waiting_for]     ; Oznacz brak gotowości na komunikację.
+        mov dword [rdx + rdi*4], INVALID_NOTEC_ID
+
+        lea rdx, [rel notec_exchange_state] ; Poinformuj Notecia m o zakończeniu komunikacji.
         mov byte [rdx + rdi], IS_READ
 
-; on idzie dalej kiedy zobaczy że jego wartość odczytana
 .wait_for_my_value_to_be_read:
-        mov al, [rdx + r14]
+        mov al, [rdx + r14]            ; Poczekaj aż Noteć m zakończy komunikację.
         cmp al, IS_READ
         jne .wait_for_my_value_to_be_read
 
@@ -244,7 +235,7 @@ notec:
 
 .exit:
         pop rax                        ; Zdejmujemy ostatni element, który został na stosie.
-        mov rsp, rbp
+        mov rsp, rbp                   ; Zwalniamy resztę pamięci zajmowanej przez stos Notecia.
         pop r15                        ; Dla zgodności z ABI przywracamy rejestry r12-r15 i rbp.
         pop r14
         pop r13
