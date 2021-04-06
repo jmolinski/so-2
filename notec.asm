@@ -12,9 +12,9 @@
 
         section .bss
         align 8
-        czy_odczytana resb N
-        top_stosu resq N
-        na_kogo_czekam resd N
+        notec_exchange_state resb N
+        stack_top_value resq N
+        waiting_for resd N
 
         section .text
 
@@ -28,10 +28,10 @@ notec:
         mov r14d, edi                  ; r14 - n
         mov r15, rsi                   ; r15 - adres ciągu instrukcji
 
-        lea rdx, [rel na_kogo_czekam]
+        lea rdx, [rel waiting_for]
         mov dword [rdx + rdi*4], -1
 
-        lea rdx, [rel czy_odczytana]
+        lea rdx, [rel notec_exchange_state]
         mov byte [rdx + r14], IS_READ
 
 .loop_condition:
@@ -200,44 +200,41 @@ notec:
 ; jnz .busy_wait                 ; Skocz, gdy blokada była zamknięta.
 
 ; poczekaj aż ten drugi zostanie zainicjowany
-        lea rdx, [rel czy_odczytana]
+        lea rdx, [rel notec_exchange_state]
 .busy_wait_for_other_notec_to_be_initialized:
         mov al, [rdx + rdi]
         cmp al, NOT_INITIALIZED
         je .busy_wait_for_other_notec_to_be_initialized
 
 ; ustaw mi flage że moja wartość stosowa nieodczytana (czekaj aż będzie się dało to zrobić)
-        lea rdx, [rel czy_odczytana]
         mov byte [rdx + r14], IS_UNREAD
 
 ; wstaw moją wartość to mojej komóreczki publicznej
-        lea rdx, [rel top_stosu]
+        lea rdx, [rel stack_top_value]
         pop rax
         mov [rdx + r14*8], rax
 
 ; ustaw mi flage że czekam na drugiego (m-tego)
-        lea rdx, [rel na_kogo_czekam]  ; Adres flagi obecnego notecia.
+        lea rdx, [rel waiting_for]     ; Adres flagi obecnego notecia.
         mov [rdx + r14*4], edi
 
 ; kiedy ten drugi ma flage że czeka na mnie wczytuje jego wartość
-        lea rdx, [rel na_kogo_czekam]  ; Czy ten drugi czeka na mnie?
+; Czy ten drugi czeka na mnie?
 .busy_wait_for_other_notec_to_want_to_communicate:
         mov eax, [rdx + rdi*4]
         cmp eax, r14d
         jne .busy_wait_for_other_notec_to_want_to_communicate
-        lea rdx, [rel top_stosu]       ; Top stosu tego drugiego.
+        lea rdx, [rel stack_top_value] ; Top stosu tego drugiego.
         mov rax, [rdx + rdi*8]
         push rax
 
 ; oznaczam mu że przeczytałem jego wartość
-        lea rdx, [rel na_kogo_czekam]
+        lea rdx, [rel waiting_for]
         mov dword [rdx + rdi*4], -1    ; ustawienie nieprawidłowego oczekiwania
-        lea rdx, [rel czy_odczytana]
+        lea rdx, [rel notec_exchange_state]
         mov byte [rdx + rdi], IS_READ
 
 ; on idzie dalej kiedy zobaczy że jego wartość odczytana
-
-        lea rdx, [rel czy_odczytana]
 .wait_for_my_value_to_be_read:
         mov al, [rdx + r14]
         cmp al, IS_READ
