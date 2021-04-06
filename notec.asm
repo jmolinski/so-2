@@ -4,20 +4,19 @@
 
         PUSH_MODE equ 0
         NUMBER_INSERT_MODE equ 1
-        MAX_HEX_DIGIT_VALUE equ 15
 
-        IS_UNREAD equ 2
-        IS_READ equ 1
         NOT_INITIALIZED equ 0
+        IS_READ equ 1
+        IS_UNREAD equ 2
 
         global notec
         extern debug
 
         section .bss
-        align 16
+        align 8
         czy_odczytana resb N
         top_stosu resq N
-        na_kogo_czekam resq N
+        na_kogo_czekam resd N
 
         section .text
 
@@ -31,10 +30,10 @@ notec:
         mov r14d, edi                  ; r14 - n
         mov r15, rsi                   ; r15 - adres ciągu instrukcji
 
-        shl rdi, 3
         lea rdx, [na_kogo_czekam]
+        shl rdi, 2
         add rdx, rdi
-        mov qword [rdx], -1
+        mov dword [rdx], -1
 
         lea rdx, [czy_odczytana]
         add rdx, r14
@@ -60,7 +59,7 @@ notec:
         je .negate_operation
         cmp al, '9'
         jbe .digit_handler_under10
-        cmp al, '='                    ; = – Wyjdź z trybu wpisywania liczby.
+        cmp al, '='
         je .loop_condition
         cmp al, 'F'
         jbe .digit_handler_uppercase_letter
@@ -154,18 +153,6 @@ notec:
 .loop_over_instructions:
         jmp .loop_condition
 
-;g – Wywołaj (zaimplementowaną gdzieś indziej w języku C lub Asemblerze) funkcję:
-.call_debug:
-        mov edi, r14d
-        mov rsi, rsp
-
-        mov r12, rsp
-        and rsp, -16
-        call debug                     ; Umieszcza w rax o ile pozycji przesunąć stos.
-
-        lea rsp, [r12 + 8*rax]
-        jmp .loop_over_instructions
-
 ; 0 to 9, A to F, a to f – Znak jest interpretowany jako cyfra w zapisie przy podstawie 16.
 ; Jeśli Noteć jest w trybie wpisywania liczby, to liczba na wierzchołku stosu jest przesuwana o jedną pozycję
 ; w lewo i uzupełniania na najmniej znaczącej pozycji podaną cyfrą. Jeśli Noteć nie jest w trybie wpisywania liczby,
@@ -195,6 +182,18 @@ notec:
 .exit_digit_handler:
         jmp .loop_condition_without_setting_push_mode
 
+;g – Wywołaj (zaimplementowaną gdzieś indziej w języku C lub Asemblerze) funkcję:
+.call_debug:
+        mov edi, r14d
+        mov rsi, rsp
+
+        mov r12, rsp
+        and rsp, -16
+        call debug                     ; Umieszcza w rax o ile pozycji przesunąć stos.
+
+        lea rsp, [r12 + 8*rax]
+        jmp .loop_over_instructions
+
 ; W – Zdejmij wartość ze stosu, potraktuj ją jako numer instancji Notecia m.
 ; Czekaj na operację W Notecia m ze zdjętym ze stosu numerem instancji Notecia n i zamień wartości na wierzchołkach stosów Noteci m i n.
 .exchange_with_other_machine:
@@ -206,9 +205,9 @@ notec:
 ; jnz .busy_wait                 ; Skocz, gdy blokada była zamknięta.
 
         mov esi, r14d
-        shl rsi, 3
+        shl rsi, 2
         mov ecx, edi
-        shl rcx, 3
+        shl rcx, 2
 
 ; poczekaj aż ten drugi zostanie zainicjowany
         lea rdx, [czy_odczytana]
@@ -226,13 +225,14 @@ notec:
 ; wstaw moją wartość to mojej komóreczki publicznej
         lea rdx, [top_stosu]
         add rdx, rsi
+        add rdx, rsi
         pop rax
         mov [rdx], rax
 
 ; ustaw mi flage że czekam na drugiego (m-tego)
         lea rdx, [na_kogo_czekam]      ; Adres flagi obecnego notecia.
         add rdx, rsi
-        mov [rdx], rdi
+        mov [rdx], edi
 
 ; kiedy ten drugi ma flage że czeka na mnie wczytuje jego wartość
         lea rdx, [na_kogo_czekam]      ; Czy ten drugi czeka na mnie?
@@ -243,13 +243,14 @@ notec:
         jne .busy_wait_for_other_notec_to_want_to_communicate
         lea rdx, [top_stosu]           ; Top stosu tego drugiego.
         add rdx, rcx
+        add rdx, rcx
         mov rax, [rdx]
         push rax
 
 ; oznaczam mu że przeczytałem jego wartość
         lea rdx, [na_kogo_czekam]
         add rdx, rcx
-        mov qword [rdx], -1            ; ustawienie nieprawidłowego oczekiwania
+        mov dword [rdx], -1            ; ustawienie nieprawidłowego oczekiwania
         lea rdx, [czy_odczytana]
         add rdx, rdi
         mov byte [rdx], IS_READ
@@ -266,7 +267,7 @@ notec:
         jmp .loop_over_instructions
 
 .exit:
-        pop rax                        ; zdejmujemy ostatni element który został na stosie
+        pop rax                        ; Zdejmujemy ostatni element, który został na stosie.
         mov rsp, rbp
         pop r15                        ; Dla zgodności z ABI przywracamy rejestry r12-r15 i rbp.
         pop r14
