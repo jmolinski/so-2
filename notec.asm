@@ -1,7 +1,5 @@
 ; autor Jakub Molinski 419502
 
-        default rel
-
         PUSH_MODE equ 0
         NUMBER_INSERT_MODE equ 1
 
@@ -30,14 +28,11 @@ notec:
         mov r14d, edi                  ; r14 - n
         mov r15, rsi                   ; r15 - adres ciągu instrukcji
 
-        lea rdx, [na_kogo_czekam]
-        shl rdi, 2
-        add rdx, rdi
-        mov dword [rdx], -1
+        lea rdx, [rel na_kogo_czekam]
+        mov dword [rdx + rdi*4], -1
 
-        lea rdx, [czy_odczytana]
-        add rdx, r14
-        mov byte [rdx], IS_READ
+        lea rdx, [rel czy_odczytana]
+        mov byte [rdx + r14], IS_READ
 
 .loop_condition:
         mov r13d, PUSH_MODE
@@ -204,63 +199,47 @@ notec:
 ; test eax, eax                  ; Sprawdź, czy blokada była otwarta.
 ; jnz .busy_wait                 ; Skocz, gdy blokada była zamknięta.
 
-        mov esi, r14d
-        shl rsi, 2
-        mov ecx, edi
-        shl rcx, 2
-
 ; poczekaj aż ten drugi zostanie zainicjowany
-        lea rdx, [czy_odczytana]
-        add rdx, rdi
+        lea rdx, [rel czy_odczytana]
 .busy_wait_for_other_notec_to_be_initialized:
-        mov al, [rdx]
+        mov al, [rdx + rdi]
         cmp al, NOT_INITIALIZED
         je .busy_wait_for_other_notec_to_be_initialized
 
 ; ustaw mi flage że moja wartość stosowa nieodczytana (czekaj aż będzie się dało to zrobić)
-        lea rdx, [czy_odczytana]
-        add rdx, r14
-        mov byte [rdx], IS_UNREAD
+        lea rdx, [rel czy_odczytana]
+        mov byte [rdx + r14], IS_UNREAD
 
 ; wstaw moją wartość to mojej komóreczki publicznej
-        lea rdx, [top_stosu]
-        add rdx, rsi
-        add rdx, rsi
+        lea rdx, [rel top_stosu]
         pop rax
-        mov [rdx], rax
+        mov [rdx + r14*8], rax
 
 ; ustaw mi flage że czekam na drugiego (m-tego)
-        lea rdx, [na_kogo_czekam]      ; Adres flagi obecnego notecia.
-        add rdx, rsi
-        mov [rdx], edi
+        lea rdx, [rel na_kogo_czekam]  ; Adres flagi obecnego notecia.
+        mov [rdx + r14*4], edi
 
 ; kiedy ten drugi ma flage że czeka na mnie wczytuje jego wartość
-        lea rdx, [na_kogo_czekam]      ; Czy ten drugi czeka na mnie?
-        add rdx, rcx
+        lea rdx, [rel na_kogo_czekam]  ; Czy ten drugi czeka na mnie?
 .busy_wait_for_other_notec_to_want_to_communicate:
-        mov eax, [rdx]
+        mov eax, [rdx + rdi*4]
         cmp eax, r14d
         jne .busy_wait_for_other_notec_to_want_to_communicate
-        lea rdx, [top_stosu]           ; Top stosu tego drugiego.
-        add rdx, rcx
-        add rdx, rcx
-        mov rax, [rdx]
+        lea rdx, [rel top_stosu]       ; Top stosu tego drugiego.
+        mov rax, [rdx + rdi*8]
         push rax
 
 ; oznaczam mu że przeczytałem jego wartość
-        lea rdx, [na_kogo_czekam]
-        add rdx, rcx
-        mov dword [rdx], -1            ; ustawienie nieprawidłowego oczekiwania
-        lea rdx, [czy_odczytana]
-        add rdx, rdi
-        mov byte [rdx], IS_READ
+        lea rdx, [rel na_kogo_czekam]
+        mov dword [rdx + rdi*4], -1    ; ustawienie nieprawidłowego oczekiwania
+        lea rdx, [rel czy_odczytana]
+        mov byte [rdx + rdi], IS_READ
 
 ; on idzie dalej kiedy zobaczy że jego wartość odczytana
 
-        lea rdx, [czy_odczytana]
-        add rdx, r14
+        lea rdx, [rel czy_odczytana]
 .wait_for_my_value_to_be_read:
-        mov al, [rdx]
+        mov al, [rdx + r14]
         cmp al, IS_READ
         jne .wait_for_my_value_to_be_read
 
