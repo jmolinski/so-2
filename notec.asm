@@ -31,7 +31,6 @@ notec:
         mov r14d, edi                  ; r14 - n
         mov r15, rsi                   ; r15 - adres ciągu instrukcji
 
-        mov edi, r14d
         shl rdi, 3
         lea rdx, [na_kogo_czekam]
         add rdx, rdi
@@ -59,19 +58,12 @@ notec:
         je .sum_operation
         cmp al, '-'
         je .negate_operation
-        mov edx, eax
-        sub dl, '0'
-        cmp dl, 9
-        cmovbe eax, edx
-        jbe .digit_handler
+        cmp al, '9'
+        jbe .digit_handler_under10
         cmp al, '='                    ; = – Wyjdź z trybu wpisywania liczby.
         je .loop_condition
-        mov edx, eax
-        sub dl, 'A'                    ; Przesunięcie aby litery A..F miały wartości 10..15.
-        add dl, 10
-        cmp dl, MAX_HEX_DIGIT_VALUE
-        cmovbe eax, edx
-        jbe .digit_handler
+        cmp al, 'F'
+        jbe .digit_handler_uppercase_letter
         cmp al, 'N'
         je .push_number_of_machines
         cmp al, 'W'
@@ -84,12 +76,8 @@ notec:
         je .remove_stack_top
         cmp al, '^'
         je .xor_operation
-        mov edx, eax
-        sub dl, 'a'                    ; Przesunięcie aby litery a..f miały wartości 10..15.
-        add dl, 10
-        cmp dl, MAX_HEX_DIGIT_VALUE
-        cmovbe eax, edx
-        jbe .digit_handler
+        cmp al, 'f'
+        jbe .digit_handler_lowercase_letter
         cmp al, 'g'
         je .call_debug
         cmp al, 'n'
@@ -186,6 +174,35 @@ notec:
         lea rsp, [r12 + 8*rax]
         jmp .loop_over_instructions
 
+; 0 to 9, A to F, a to f – Znak jest interpretowany jako cyfra w zapisie przy podstawie 16.
+; Jeśli Noteć jest w trybie wpisywania liczby, to liczba na wierzchołku stosu jest przesuwana o jedną pozycję
+; w lewo i uzupełniania na najmniej znaczącej pozycji podaną cyfrą. Jeśli Noteć nie jest w trybie wpisywania liczby,
+; to na wierzchołek stosu jest wstawiana wartość podanej cyfry. Noteć przechodzi w tryb wpisywania liczby
+; po wczytaniu jednego ze znaków z tej grupy, a wychodzi z trybu wpisywania liczby po wczytaniu dowolnego znaku
+; nie należącego to tej grupy.
+
+.digit_handler_under10:
+        sub al, '0'                    ; Conversion from ascii digit to integer value.
+        jmp .digit_handler
+.digit_handler_lowercase_letter:
+        sub al, 32                     ; Conversion from lowercase to uppercase letter.
+.digit_handler_uppercase_letter:
+        sub al, 'A'                    ; Conversiom from uppercase letter to 10..15 value.
+        add al, 10
+.digit_handler:
+        cmp r13d, NUMBER_INSERT_MODE
+        je .digit_handler_shift_mode
+        mov r13d, NUMBER_INSERT_MODE
+        push rax
+        jmp .exit_digit_handler
+.digit_handler_shift_mode:
+        pop rdi
+        shl rdi, 4
+        or rdi, rax
+        push rdi
+.exit_digit_handler:
+        jmp .loop_condition_without_setting_push_mode
+
 ; W – Zdejmij wartość ze stosu, potraktuj ją jako numer instancji Notecia m.
 ; Czekaj na operację W Notecia m ze zdjętym ze stosu numerem instancji Notecia n i zamień wartości na wierzchołkach stosów Noteci m i n.
 .exchange_with_other_machine:
@@ -242,39 +259,19 @@ notec:
         add rdx, rcx
         mov qword [rdx], -1            ; ustawienie nieprawidłowego oczekiwania
         lea rdx, [czy_odczytana]
-        add rdx, rcx
+        add rdx, rdi
         mov byte [rdx], IS_READ
 
 ; on idzie dalej kiedy zobaczy że jego wartość odczytana
 
         lea rdx, [czy_odczytana]
-        add rdx, rsi
+        add rdx, r14
 .wait_for_my_value_to_be_read:
-        mov eax, [rdx]
-        cmp eax, IS_READ
+        mov al, [rdx]
+        cmp al, IS_READ
         jne .wait_for_my_value_to_be_read
 
         jmp .loop_over_instructions
-
-; 0 to 9, A to F, a to f – Znak jest interpretowany jako cyfra w zapisie przy podstawie 16.
-; Jeśli Noteć jest w trybie wpisywania liczby, to liczba na wierzchołku stosu jest przesuwana o jedną pozycję
-; w lewo i uzupełniania na najmniej znaczącej pozycji podaną cyfrą. Jeśli Noteć nie jest w trybie wpisywania liczby,
-; to na wierzchołek stosu jest wstawiana wartość podanej cyfry. Noteć przechodzi w tryb wpisywania liczby
-; po wczytaniu jednego ze znaków z tej grupy, a wychodzi z trybu wpisywania liczby po wczytaniu dowolnego znaku
-; nie należącego to tej grupy.
-.digit_handler:
-        cmp r13d, NUMBER_INSERT_MODE
-        je .digit_handler_shift_mode
-        mov r13d, NUMBER_INSERT_MODE
-        push rax
-        jmp .exit_digit_handler
-.digit_handler_shift_mode:
-        pop rdi
-        shl rdi, 4
-        or rdi, rax
-        push rdi
-.exit_digit_handler:
-        jmp .loop_condition_without_setting_push_mode
 
 .exit:
         pop rax                        ; zdejmujemy ostatni element który został na stosie
