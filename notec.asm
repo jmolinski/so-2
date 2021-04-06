@@ -15,7 +15,7 @@
 
         section .bss
         align 16
-        czy_odczytana resq N
+        czy_odczytana resb N
         top_stosu resq N
         na_kogo_czekam resq N
 
@@ -38,8 +38,8 @@ notec:
         mov qword [rdx], -1
 
         lea rdx, [czy_odczytana]
-        add rdx, rdi
-        mov dword [rdx], IS_READ
+        add rdx, r14
+        mov byte [rdx], IS_READ
 
 .loop_condition:
         mov r13d, PUSH_MODE
@@ -203,16 +203,16 @@ notec:
 
 ; poczekaj aż ten drugi zostanie zainicjowany
         lea rdx, [czy_odczytana]
-        add rdx, rcx
+        add rdx, rdi
 .busy_wait_for_other_notec_to_be_initialized:
-        mov eax, [rdx]
-        cmp eax, NOT_INITIALIZED
+        mov al, [rdx]
+        cmp al, NOT_INITIALIZED
         je .busy_wait_for_other_notec_to_be_initialized
 
 ; ustaw mi flage że moja wartość stosowa nieodczytana (czekaj aż będzie się dało to zrobić)
         lea rdx, [czy_odczytana]
-        add rdx, rsi
-        mov dword [rdx], IS_UNREAD
+        add rdx, r14
+        mov byte [rdx], IS_UNREAD
 
 ; wstaw moją wartość to mojej komóreczki publicznej
         lea rdx, [top_stosu]
@@ -223,7 +223,6 @@ notec:
 ; ustaw mi flage że czekam na drugiego (m-tego)
         lea rdx, [na_kogo_czekam]      ; Adres flagi obecnego notecia.
         add rdx, rsi
-
         mov [rdx], rdi
 
 ; kiedy ten drugi ma flage że czeka na mnie wczytuje jego wartość
