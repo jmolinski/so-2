@@ -17,9 +17,9 @@
 
         section .bss
         align 8
-        notec_exchange_state resb N
         stack_top_value resq N
         waiting_for resd N
+        notec_exchange_state resb N
 
         section .text
 
