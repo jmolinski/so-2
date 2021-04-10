@@ -3,11 +3,10 @@
         PUSH_MODE equ 0
         NUMBER_INSERT_MODE equ 1
 
-        NOT_INITIALIZED equ 0
-        IS_READ equ 1
-        IS_UNREAD equ 2
+        IS_READ equ 0
+        IS_UNREAD equ 1
 
-        INVALID_NOTEC_ID equ -1
+        INVALID_NOTEC_ID equ 0
         LOWERCASE_UPPERCASE_DIFF equ 32
         UPPERCASE_HEX_TO_INT_DIFF equ 55
         BITS_PER_HEX_DIGIT equ 4
@@ -32,11 +31,6 @@ notec:
         mov rbp, rsp                   ; Zapisuję adres powrotu.
         mov r14d, edi                  ; r14 - n (numer notecia).
         mov r15, rsi                   ; r15 - adres ciągu instrukcji.
-
-        lea rdx, [rel waiting_for]     ; Inicjalizacja zmiennych służących synchronizacji.
-        mov dword [rdx + rdi*4], INVALID_NOTEC_ID
-        lea rdx, [rel notec_exchange_state]
-        mov byte [rdx + r14], IS_READ
 
 .loop_condition:
         mov r13d, PUSH_MODE
@@ -122,7 +116,7 @@ notec:
         jmp .loop_over_instructions
 ; Wstaw na stos liczbę Noteci.
 .push_number_of_machines:
-        mov eax, N
+        mov rax, N
         jmp .push_rax_and_loop_over_instructions
 ; Zamień miejscami dwie wartości na wierzchu stosu.
 .exchange_stack_top:
@@ -196,12 +190,7 @@ notec:
 .exchange_with_other_machine:
         pop rdi                        ; Numer notecia m.
 
-        lea rdx, [rel notec_exchange_state]
-.busy_wait_for_other_notec_to_be_initialized:
-        mov al, [rdx + rdi]            ; Poczekaj aż Noteć m zostanie zainicjalizowany.
-        cmp al, NOT_INITIALIZED
-        je .busy_wait_for_other_notec_to_be_initialized
-
+        lea rdx, [rel notec_exchange_state] ; rcx - adres tablicy notec_exchange_state.
         mov byte [rdx + r14], IS_UNREAD ; Ustaw flagę, że moja wartość czeka na odebranie.
 
         lea rdx, [rel stack_top_value] ; Umieść wierzchołek stosu w tablicy.
@@ -209,10 +198,13 @@ notec:
         mov [rdx + r14*8], rax
 
         lea rdx, [rel waiting_for]     ; Oznacz gotowość na komunikację z Noteciem m.
+        inc edi
         mov [rdx + r14*4], edi
+        dec edi
 
 .busy_wait_for_other_notec_to_want_to_communicate:
         mov eax, [rdx + rdi*4]         ; Czekaj aż Noteć m będzie gotowy na komunikację.
+        dec eax
         cmp eax, r14d
         jne .busy_wait_for_other_notec_to_want_to_communicate
 
@@ -223,8 +215,8 @@ notec:
         lea rdx, [rel waiting_for]     ; Oznacz brak gotowości na komunikację.
         mov dword [rdx + rdi*4], INVALID_NOTEC_ID
 
-        lea rdx, [rel notec_exchange_state] ; Poinformuj Notecia m o zakończeniu komunikacji.
-        mov byte [rdx + rdi], IS_READ
+        lea rdx, [rel notec_exchange_state]
+        mov byte [rdx + rdi], IS_READ  ; Poinformuj Notecia m o zakończeniu komunikacji.
 
 .wait_for_my_value_to_be_read:
         mov al, [rdx + r14]            ; Poczekaj aż Noteć m zakończy komunikację.
