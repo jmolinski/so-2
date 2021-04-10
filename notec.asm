@@ -190,36 +190,33 @@ notec:
 .exchange_with_other_machine:
         pop rdi                        ; Numer notecia m.
 
-        lea rdx, [rel notec_exchange_state] ; rcx - adres tablicy notec_exchange_state.
-        mov byte [rdx + r14], IS_UNREAD ; Ustaw flagę, że moja wartość czeka na odebranie.
+        lea rcx, [rel notec_exchange_state] ; rcx - adres tablicy notec_exchange_state.
+        lea rsi, [rel stack_top_value] ; rsi - adres tablicy stack_top_value.
+        lea rdx, [rel waiting_for]     ; rdx - adres tablicy stack_top_value.
 
-        lea rdx, [rel stack_top_value] ; Umieść wierzchołek stosu w tablicy.
-        pop rax
-        mov [rdx + r14*8], rax
+        mov byte [rcx + r14], IS_UNREAD ; Ustaw flagę, że moja wartość czeka na odebranie.
 
-        lea rdx, [rel waiting_for]     ; Oznacz gotowość na komunikację z Noteciem m.
-        inc edi
+        pop rax                        ; Umieść wierzchołek stosu w tablicy.
+        mov [rsi + r14*8], rax
+
+        inc edi                        ; Oznacz gotowość na komunikację z Noteciem m. Numeracja przesunięta o 1.
         mov [rdx + r14*4], edi
         dec edi
 
 .busy_wait_for_other_notec_to_want_to_communicate:
         mov eax, [rdx + rdi*4]         ; Czekaj aż Noteć m będzie gotowy na komunikację.
-        dec eax
+        dec eax                        ; Numery noteci są przesunięte o 1.
         cmp eax, r14d
         jne .busy_wait_for_other_notec_to_want_to_communicate
 
-        lea rdx, [rel stack_top_value] ; Wczytaj wierzchołek stosu Notecia m.
-        mov rax, [rdx + rdi*8]
+        mov rax, [rsi + rdi*8]         ; Wczytaj wierzchołek stosu Notecia m.
         push rax
 
-        lea rdx, [rel waiting_for]     ; Oznacz brak gotowości na komunikację.
-        mov dword [rdx + rdi*4], INVALID_NOTEC_ID
-
-        lea rdx, [rel notec_exchange_state]
-        mov byte [rdx + rdi], IS_READ  ; Poinformuj Notecia m o zakończeniu komunikacji.
+        mov dword [rdx + rdi*4], INVALID_NOTEC_ID ; Oznacz brak gotowości na komunikację.
+        mov byte [rcx + rdi], IS_READ  ; Poinformuj Notecia m o zakończeniu komunikacji.
 
 .wait_for_my_value_to_be_read:
-        mov al, [rdx + r14]            ; Poczekaj aż Noteć m zakończy komunikację.
+        mov al, [rcx + r14]            ; Poczekaj aż Noteć m zakończy komunikację.
         cmp al, IS_READ
         jne .wait_for_my_value_to_be_read
 
