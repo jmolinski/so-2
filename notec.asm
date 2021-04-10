@@ -185,7 +185,7 @@ notec:
         mov rsi, rsp                   ; Argument - wskaźnik na wierzchołek stosu.
 
         mov r12, rsp                   ; Wyrównanie stosu (wymóg ABI).
-        and rsp, -16                   ; Zmiana na najmniejszą liczbę podzielną przez 16 niemniejszą od rsp.
+        and rsp, -16                   ; Zmiana na największą liczbę podzielną przez 16 niewiększą od rsp.
         call debug                     ; Umieszcza w rax o ile pozycji przesunąć stos.
 
         lea rsp, [r12 + 8*rax]
